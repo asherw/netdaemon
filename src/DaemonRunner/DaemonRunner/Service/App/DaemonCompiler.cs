@@ -35,7 +35,13 @@ namespace NetDaemon.Service.App
     /// </summary>
     internal sealed class DaemonCompiler
     {
-        public static (IEnumerable<Type>, CollectibleAssemblyLoadContext?) GetDaemonApps(string codeFolder, ILogger logger)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="appCodeFolder">The location of the app folder.</param>
+        /// <param name="logger"></param>
+        /// <returns></returns>
+        public static (IEnumerable<Type>, CollectibleAssemblyLoadContext?) GetDaemonApps(string appCodeFolder, ILogger logger)
         {
             var loadedApps = new List<Type>(50);
 
@@ -56,7 +62,7 @@ namespace NetDaemon.Service.App
             }
             CollectibleAssemblyLoadContext alc;
             // Load the compiled apps
-            var (compiledApps, compileErrorText) = GetCompiledApps(out alc, codeFolder, logger);
+            var (compiledApps, compileErrorText) = GetCompiledApps(out alc, appCodeFolder, logger);
 
             if (compiledApps is object)
                 loadedApps.AddRange(compiledApps);
@@ -67,6 +73,8 @@ namespace NetDaemon.Service.App
 
             return (loadedApps, alc);
         }
+
+
 
         private static IEnumerable<Type>? LoadLocalAssemblyApplicationsForDevelopment()
         {
@@ -134,7 +142,44 @@ namespace NetDaemon.Service.App
             return metaDataReference;
         }
 
-        private static CSharpCompilation GetCsCompilation(string codeFolder)
+        public static Assembly GetCompiledAppsAssembly(string appCodeFolder, ILogger logger)
+        {
+            var alc = new CollectibleAssemblyLoadContext();
+
+            try
+            {
+                var compilation = GetCsCompilation(appCodeFolder);
+
+                foreach (var syntaxTree in compilation.SyntaxTrees)
+                {
+                    if (Path.GetFileName(syntaxTree.FilePath) != "_EntityExtensions.cs")
+                        WarnIfExecuteIsMissing(syntaxTree, compilation, logger);
+                }
+
+                using (var peStream = new MemoryStream())
+                {
+                    var emitResult = compilation.Emit(peStream: peStream);
+
+                    if (emitResult.Success)
+                    {
+                        peStream.Seek(0, SeekOrigin.Begin);
+
+                        return alc!.LoadFromStream(peStream);
+                    }
+                    
+                    throw new ApplicationException("An error occured while attempting to compile the application assembly.");
+                }
+            }
+            finally
+            {
+                alc.Unload();
+                // Finally do cleanup and release memory
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+        }
+
+        public static CSharpCompilation GetCsCompilation(string codeFolder)
         {
             var syntaxTrees = LoadSyntaxTree(codeFolder);
             var metaDataReference = GetDefaultReferences();
@@ -148,7 +193,7 @@ namespace NetDaemon.Service.App
                     assemblyIdentityComparer: DesktopAssemblyIdentityComparer.Default));
         }
 
-        public static (IEnumerable<Type>?, string) GetCompiledApps(out CollectibleAssemblyLoadContext alc, string codeFolder, ILogger logger)
+        public static (IEnumerable<Type>?, string) GetCompiledApps(out CollectibleAssemblyLoadContext alc, string appCodeFolder, ILogger logger)
         {
 
             alc = new CollectibleAssemblyLoadContext();
@@ -156,7 +201,7 @@ namespace NetDaemon.Service.App
 
             try
             {
-                var compilation = GetCsCompilation(codeFolder);
+                var compilation = GetCsCompilation(appCodeFolder);
 
                 foreach (var syntaxTree in compilation.SyntaxTrees)
                 {
@@ -182,6 +227,7 @@ namespace NetDaemon.Service.App
                         peStream.Seek(0, SeekOrigin.Begin);
 
                         var asm = alc!.LoadFromStream(peStream);
+
                         return (asm.GetTypes() // Get all types
                                 .Where(type => type.IsClass && type.IsSubclassOf(typeof(NetDaemonAppBase))) // That is a app
                                     , ""); // And return a list apps

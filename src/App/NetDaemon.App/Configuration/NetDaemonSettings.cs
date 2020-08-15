@@ -1,4 +1,4 @@
-﻿namespace NetDaemon.Service.Configuration
+﻿namespace NetDaemon.Configuration
 {
     public class NetDaemonSettings
     {

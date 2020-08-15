@@ -49,3 +49,4 @@ codecover
 ### Jetbrains / Rider ###
 # User-specific files
 .idea/
+/src/Service/Properties/launchSettings.json

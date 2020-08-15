@@ -17,7 +17,7 @@ namespace NetDaemon.Service.App
     public class CodeGenerator
     {
         /// <summary>
-        ///     Mapps the domain to corresponding implemented Fluent API, will be added as
+        ///     Maps the domain to corresponding implemented Fluent API, will be added as
         ///     more and more entity types are supported
         /// </summary>
         private static IDictionary<string, (string, string)> _FluentApiMapper = new Dictionary<string, (string, string)>

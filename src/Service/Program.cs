@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using NetDaemon;
 using Serilog;
 
@@ -17,13 +18,14 @@ namespace Service
             try
             {
                 Log.Logger = SerilogConfigurator.Configure().CreateLogger();
+                var appStartLogging = LoggerFactory.Create(builder => builder.AddSerilog(Log.Logger, dispose: true)).CreateLogger<Program>();
 
                 if (File.Exists(HassioConfigPath))
                     await ReadHassioConfig();
 
                 await Host.CreateDefaultBuilder(args)
-                    .UseSerilog(Log.Logger)
-                    .UseNetDaemon()
+                    .ConfigureLogging(builder => builder.AddSerilog(Log.Logger))
+                    .UseNetDaemon(appStartLogging)
                     .Build()
                     .RunAsync();
             }
@@ -35,6 +37,14 @@ namespace Service
             {
                 Log.CloseAndFlush();
             }
+        }
+
+        public void ValidateSourceFolder(string sourceFolder)
+        {
+            // Automatically create source directories
+            if (!Directory.Exists(sourceFolder))
+                Directory.CreateDirectory(sourceFolder);
+
         }
 
         private static async Task ReadHassioConfig()

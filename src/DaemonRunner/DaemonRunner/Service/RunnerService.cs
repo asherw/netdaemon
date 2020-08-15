@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -9,6 +8,7 @@ using JoySoftware.HomeAssistant.Client;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using NetDaemon.Configuration;
 using NetDaemon.Daemon;
 using NetDaemon.Daemon.Storage;
 using NetDaemon.Service.App;
@@ -25,6 +25,7 @@ namespace NetDaemon.Service
         private const string Version = "dev";
 
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IInstanceDaemonApp _codeManager;
         private readonly HomeAssistantSettings _homeAssistantSettings;
         private readonly NetDaemonSettings _netDaemonSettings;
 
@@ -36,12 +37,14 @@ namespace NetDaemon.Service
             ILoggerFactory loggerFactory, 
             IHttpClientFactory httpClientFactory, 
             IOptions<NetDaemonSettings> netDaemonSettings,
-            IOptions<HomeAssistantSettings> homeAssistantSettings
+            IOptions<HomeAssistantSettings> homeAssistantSettings,
+            IInstanceDaemonApp codeManager
             )
         {
             _loggerFactory = loggerFactory;
             _logger = loggerFactory.CreateLogger<RunnerService>();
             _httpClientFactory = httpClientFactory;
+            _codeManager = codeManager;
             _homeAssistantSettings = homeAssistantSettings.Value;
             _netDaemonSettings = netDaemonSettings.Value;
         }
@@ -67,14 +70,9 @@ namespace NetDaemon.Service
                 var storageFolder = Path.Combine(_netDaemonSettings.SourceFolder!, ".storage");
                 var sourceFolder = Path.Combine(_netDaemonSettings.SourceFolder!, "apps");
 
-                // Automatically create source directories
-                if (!Directory.Exists(sourceFolder))
-                    Directory.CreateDirectory(sourceFolder);
-
                 var hasConnectedBefore = false;
 
                 CollectibleAssemblyLoadContext? alc = null;
-                IEnumerable<Type>? loadedDaemonApps = null;
 
                 while (!stoppingToken.IsCancellationRequested)
                 {
@@ -116,19 +114,7 @@ namespace NetDaemon.Service
                                         // Generate code if requested
                                         await GenerateEntities(daemonHost, sourceFolder);
 
-                                        if (loadedDaemonApps is null)
-                                        {
-                                            (loadedDaemonApps, alc) = DaemonCompiler.GetDaemonApps(sourceFolder!, _logger);
-                                        }
-
-                                        if (loadedDaemonApps is null || !loadedDaemonApps.Any())
-                                        {
-                                            _logger.LogWarning("No .cs files files found, please add files to [netdaemonfolder]/apps");
-                                            return;
-                                        }
-
-                                        IInstanceDaemonApp? codeManager = new CodeManager(sourceFolder, loadedDaemonApps, _logger);
-                                        await daemonHost.Initialize(codeManager).ConfigureAwait(false);
+                                        await daemonHost.Initialize(_codeManager).ConfigureAwait(false);
 
                                         // Wait until daemon stops
                                         await daemonHostTask.ConfigureAwait(false);
@@ -172,7 +158,7 @@ namespace NetDaemon.Service
                 }
                 if (alc is object)
                 {
-                    loadedDaemonApps = null;
+                    //loadedDaemonApps = null;
                     var alcWeakRef = new WeakReference(alc, trackResurrection: true);
                     alc.Unload();
                     alc = null;
