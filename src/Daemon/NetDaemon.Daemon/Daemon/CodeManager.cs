@@ -16,7 +16,7 @@ namespace NetDaemon.Daemon
         private readonly ILogger _logger;
         private readonly YamlConfig _yamlConfig;
         private readonly IAppTypeFactory _appTypeFactory;
-        private IEnumerable<INetDaemonAppBase>? _loadedDaemonApps;
+        private int _numberOfAppsFound;
 
         /// <summary>
         ///     Constructor
@@ -30,9 +30,10 @@ namespace NetDaemon.Daemon
             _logger = logger;
             _yamlConfig = yamlConfig;
             _appTypeFactory = appTypeFactory;
+            _numberOfAppsFound = 0;
         }
 
-        public int Count => _loadedDaemonApps.Count();
+        public int Count => _numberOfAppsFound;
 
         public IEnumerable<INetDaemonAppBase> InstanceDaemonApps()
         {
@@ -54,6 +55,7 @@ namespace NetDaemon.Daemon
                 foreach (var appInstance in yamlAppConfig.Instances)
                 {
                     result.Add(appInstance);
+                    _numberOfAppsFound++;
                 }
             }
             return result;

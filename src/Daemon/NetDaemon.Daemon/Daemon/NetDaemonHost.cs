@@ -1188,9 +1188,13 @@ namespace NetDaemon.Daemon
             }
         }
 
+        private int _numberOfAppsFound;
+
         /// <inheritdoc/>
         private async Task LoadAllApps()
         {
+            _numberOfAppsFound = 0;
+
             _ = _appInstanceManager ?? throw new NullReferenceException(nameof(_appInstanceManager));
 
             // First unload any apps running
@@ -1204,6 +1208,8 @@ namespace NetDaemon.Daemon
 
             foreach (INetDaemonAppBase appInstance in instancedApps!)
             {
+                _numberOfAppsFound++;
+
                 if (await RestoreAppState(appInstance).ConfigureAwait(false))
                 {
                     _runningAppInstances[appInstance.Id!] = appInstance;
@@ -1230,7 +1236,7 @@ namespace NetDaemon.Daemon
                 Logger.LogInformation("Successfully loaded app {appId} ({class})", sortedApp.Id, sortedApp.GetType().Name);
             }
 
-            await SetDaemonStateAsync(_appInstanceManager.Count, _runningAppInstances.Count).ConfigureAwait(false);
+            await SetDaemonStateAsync(_numberOfAppsFound, _runningAppInstances.Count).ConfigureAwait(false);
         }
 
         private void RegisterAppSwitchesAndTheirStates()
