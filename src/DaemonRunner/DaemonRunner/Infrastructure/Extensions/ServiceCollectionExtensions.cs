@@ -1,4 +1,6 @@
-﻿using System.Linq;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,12 +17,20 @@ namespace NetDaemon.Infrastructure.Extensions
         /// <param name="lifetime"></param>
         public static void RegisterAllTypes<T>(this IServiceCollection services, Assembly assembly, ServiceLifetime lifetime = ServiceLifetime.Transient)
         {
-            var typesFromAssemblies = assembly.ExportedTypes.Where(x => x.BaseType == typeof(T));
+            var typesFromAssemblies = assembly.GetTypesWhereBaseType<T>();
 
             foreach (var type in typesFromAssemblies)
             {
                 services.Add(new ServiceDescriptor(type, type, lifetime));
             }
+        }
+    }
+
+    public static class AssemblyExtensions
+    {
+        public static IEnumerable<Type> GetTypesWhereBaseType<T>(this Assembly assembly)
+        {
+            return assembly.ExportedTypes.Where(x => x.BaseType == typeof(T));
         }
     }
 }

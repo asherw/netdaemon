@@ -3,30 +3,26 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Microsoft.Extensions.DependencyInjection;
 using NetDaemon.Common;
-using NetDaemon.Common.Reactive;
 using YamlDotNet.RepresentationModel;
 
 namespace NetDaemon.Daemon.Config
 {
     public class YamlAppConfig
     {
-        private readonly IEnumerable<Type> _types;
         private readonly YamlStream _yamlStream;
         private readonly YamlConfig _yamlConfig;
         private readonly string _yamlFilePath;
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IAppTypeFactory _ndApps;
 
-        public YamlAppConfig(IEnumerable<Type> types, TextReader reader, YamlConfig yamlConfig, string yamlFilePath, IServiceProvider serviceProvider)
+        public YamlAppConfig(TextReader reader, YamlConfig yamlConfig, string yamlFilePath, IAppTypeFactory ndApps)
         {
-            _types = types;
             _yamlStream = new YamlStream();
             _yamlStream.Load(reader);
 
             _yamlConfig = yamlConfig;
             _yamlFilePath = yamlFilePath;
-            _serviceProvider = serviceProvider;
+            _ndApps = ndApps;
         }
 
         public IEnumerable<INetDaemonAppBase> Instances
@@ -51,12 +47,12 @@ namespace NetDaemon.Daemon.Config
 
                         string? appClass = GetTypeNameFromClassConfig((YamlMappingNode)app.Value);
 
-                        var appType = Type.GetType(appClass!);
+                        //var appType = Type.GetType(appClass!);
 
-                        if (appType == null)
-                            throw new ArgumentNullException("app class", $"Could not find app class: {appClass}.  Please make sure namespace and class name match yaml configuration.");
+                        //if (appType == null)
+                        //    throw new ArgumentNullException("app class", $"Could not find app class: {appClass}.  Please make sure namespace and class name match yaml configuration.");
 
-                        var instance = InstanceAndSetPropertyConfig(appType, ((YamlMappingNode)app.Value), appId);
+                        var instance = InstanceAndSetPropertyConfig(appClass!, ((YamlMappingNode)app.Value), appId);
 
                         if (instance != null)
                         {
@@ -74,12 +70,14 @@ namespace NetDaemon.Daemon.Config
             }
         }
         
-        public INetDaemonAppBase? InstanceAndSetPropertyConfig(Type netDaemonAppType, YamlMappingNode appNode, string? appId)
+        public INetDaemonAppBase? InstanceAndSetPropertyConfig(string appClass, YamlMappingNode appNode, string? appId)
         {
-            var netDaemonApp = (INetDaemonAppBase?) _serviceProvider.GetService(netDaemonAppType);
+            var netDaemonApp = (INetDaemonAppBase?)_ndApps.ResolveByClassName(appClass);
 
             if (netDaemonApp == null)
                 return null;
+
+            var netDaemonAppType = netDaemonApp.GetType();
 
             foreach (KeyValuePair<YamlNode, YamlNode> entry in appNode.Children)
             {
@@ -194,7 +192,7 @@ namespace NetDaemon.Daemon.Config
             {
                 return null;
             }
-            return ((YamlScalarNode)classChild.Value)?.Value?.ToLowerInvariant();
+            return ((YamlScalarNode)classChild.Value)?.Value;
         }
     }
 }

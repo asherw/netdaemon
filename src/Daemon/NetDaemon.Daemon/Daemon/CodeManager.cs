@@ -14,8 +14,8 @@ namespace NetDaemon.Daemon
     public sealed class CodeManager : IInstanceDaemonApp
     {
         private readonly ILogger _logger;
-        private readonly IServiceProvider _serviceProvider;
         private readonly YamlConfig _yamlConfig;
+        private readonly IAppTypeFactory _appTypeFactory;
         private IEnumerable<INetDaemonAppBase>? _loadedDaemonApps;
 
         /// <summary>
@@ -24,11 +24,12 @@ namespace NetDaemon.Daemon
         /// <param name="daemonAppTypes">App compiled app types</param>
         /// <param name="logger">ILogger instance to use</param>
         /// <param name="serviceProvider"></param>
-        public CodeManager(ILogger logger, IServiceProvider serviceProvider, YamlConfig yamlConfig)
+        /// <param name="appTypeFactory"></param>
+        public CodeManager(ILogger logger, YamlConfig yamlConfig, IAppTypeFactory appTypeFactory)
         {
             _logger = logger;
-            _serviceProvider = serviceProvider;
             _yamlConfig = yamlConfig;
+            _appTypeFactory = appTypeFactory;
         }
 
         public int Count => _loadedDaemonApps.Count();
@@ -48,9 +49,7 @@ namespace NetDaemon.Daemon
 
             foreach (string file in allConfigFilePaths)
             {
-                // TODO: Rework.  Use IOC
-
-                var yamlAppConfig = new YamlAppConfig(new List<Type>(), File.OpenText(file), _yamlConfig, file, _serviceProvider);
+                var yamlAppConfig = new YamlAppConfig(File.OpenText(file), _yamlConfig, file, _appTypeFactory);
 
                 foreach (var appInstance in yamlAppConfig.Instances)
                 {
